@@ -523,6 +523,10 @@ public class GitDestination implements Destination<GitRevision> {
 
       GitRevision localBranchRevision = getLocalBranchRevision(scratchClone);
       updateLocalBranchToBaseline(scratchClone, baseline);
+      
+      // Capture firstWrite state before it gets modified
+      boolean isFirstWrite = state.firstWrite;
+      
       if (state.firstWrite) {
         String reference = baseline != null ? baseline : state.localBranch;
         configForPush(getRepository(console), repoUrl, remotePush);
@@ -563,7 +567,7 @@ public class GitDestination implements Destination<GitRevision> {
 
       // Push LFS objects to destination at the start of the workflow
       // This must happen after we have the origin files in transformResult.getPath()
-      if (state.firstWrite && lfsSource != null) {
+      if (isFirstWrite && lfsSource != null) {
         pushLfsObjectsToDestination(alternate, destinationFiles, console);
       }
 
