@@ -233,18 +233,18 @@ public final class CommandRunner {
     } finally {
       String commandName = cmd.getCommandLineElements()[0];
 
-      // if (maxOutLogLines != 0) {
-      //   logOutput(
-      //       Level.INFO,
-      //       String.format("'%s' STDOUT: ", commandName),
-      //       stdoutCollector,
-      //       maxOutLogLines);
-      //   logOutput(
-      //       Level.INFO,
-      //       String.format("'%s' STDERR: ", commandName),
-      //       stderrCollector,
-      //       maxOutLogLines);
-      // }
+      if (maxOutLogLines != 0) {
+        logOutput(
+            Level.INFO,
+            String.format("'%s' STDOUT: ", commandName),
+            stdoutCollector,
+            maxOutLogLines);
+        logOutput(
+            Level.INFO,
+            String.format("'%s' STDERR: ", commandName),
+            stderrCollector,
+            maxOutLogLines);
+      }
 
       String finishMsg;
       if (cmdMonitor.hasTimedOut()) {

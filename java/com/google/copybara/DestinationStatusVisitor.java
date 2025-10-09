@@ -47,7 +47,6 @@ public class DestinationStatusVisitor implements ChangesVisitor {
   @Override
   public VisitResult visit(Change<? extends Revision> change) {
     ImmutableSet<String> changeFiles = change.getChangeFiles();
-    
     if (changeFiles != null) {
       if (change.getLabels().containsKey(labelName)) {
         for (String file : changeFiles) {

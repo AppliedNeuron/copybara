@@ -71,7 +71,6 @@ public final class CommandLineDiffUtil implements MergeRunner {
             labelFlag,
             label(rhs, workDir),
             mArg);
-    
     Command cmd =
         new Command(
             argv.toArray(new String[0]), environmentVariables, workDir.toFile());
@@ -95,6 +94,7 @@ public final class CommandLineDiffUtil implements MergeRunner {
     } catch (CommandException e) {
       throw new IOException("Error while executing diff3", e);
     }
+
     return MergeResult.create(
         ByteString.copyFrom(output.getStdoutBytes()), MergeResultCode.SUCCESS);
   }

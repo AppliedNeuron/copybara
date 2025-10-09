@@ -256,7 +256,6 @@ public enum WorkflowMode {
       String originLabelName = runHelper.getLabelNameWhenOrigin();
       Optional<Baseline<O>> baseline;
       /*originRevision=*/
-      
       baseline = Strings.isNullOrEmpty(runHelper.workflowOptions().changeBaseline)
           ? runHelper.getOriginReader().findBaseline(runHelper.getResolvedRef(), originLabelName)
           : Optional.of(
