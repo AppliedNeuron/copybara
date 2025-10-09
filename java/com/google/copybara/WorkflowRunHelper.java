@@ -945,15 +945,18 @@ public class WorkflowRunHelper<O extends Revision, D extends Revision> {
           preMergeImportWorkdir,
           CopySymlinkStrategy.IGNORE_INVALID_SYMLINKS,
           Glob.ALL_FILES);
+      
       Pattern debugPattern =
           workflow.getWorkflowOptions().debugMergeImport != null
               ? Pattern.compile(workflow.getWorkflowOptions().debugMergeImport)
               : null;
+      
       MergeRunner mergeRunner =
           new CommandLineDiffUtil(
               workflow.getGeneralOptions().getDiffBin(),
               workflow.getGeneralOptions().getEnvironment(),
               debugPattern);
+      
       if (workflow.getGeneralOptions().isTemporaryFeature("use_patch_merge", false)
           || workflow.getMergeImport().mergeStrategy()
               == MergeImportConfiguration.MergeStrategy.PATCH_MERGE) {
@@ -970,6 +973,7 @@ public class WorkflowRunHelper<O extends Revision, D extends Revision> {
               mergeRunner,
               workflow.getWorkflowOptions().threadsForMergeImport,
               debugPattern);
+      
       ImmutableList<String> mergeErrorPaths;
       try (ProfilerTask ignored = profiler().start("merge_tool")) {
         mergeErrorPaths =

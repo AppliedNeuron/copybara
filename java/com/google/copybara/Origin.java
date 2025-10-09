@@ -365,6 +365,7 @@ public interface Origin<R extends Revision> extends ConfigItemDescription, Starl
         if (input.getRevision().asString().equals(startRevision.asString())) {
           return VisitResult.CONTINUE;
         }
+
         ImmutableMap<String, Collection<String>> labels = input.getLabels().asMap();
         if (!labels.containsKey(label)) {
           return VisitResult.CONTINUE;
