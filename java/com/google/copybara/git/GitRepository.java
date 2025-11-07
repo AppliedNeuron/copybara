@@ -17,6 +17,7 @@
 package com.google.copybara.git;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.copybara.exception.ValidationException.checkCondition;
 import static com.google.copybara.util.CommandRunner.DEFAULT_TIMEOUT;
 import static com.google.copybara.util.CommandRunner.NO_INPUT;
@@ -1681,34 +1682,49 @@ public class GitRepository {
   }
 
   /**
-   * Pulls Git LFS files for a specific commit/ref into the working tree.
-   * 
-   * <p>This is necessary when GIT_LFS_SKIP_SMUDGE=1 is set, which causes git operations to
-   * work with LFS pointer files instead of actual file content. This method temporarily
-   * configures remote.origin.url, pulls the LFS files, then cleans up the configuration.
+   * Fetch and push specific LFS objects that are missing from the destination.
    *
-   * <p>This method pulls only the LFS objects referenced by the specified commit,
-   * which is much faster than pulling all LFS files for large repositories.
-   *
-   * @param remoteUrl The URL to set as remote.origin.url for LFS operations
-   * @param ref Git ref (commit SHA, branch, or tag) to pull LFS files for (required)
+   * @param sourceUrl The URL to fetch missing LFS objects from (e.g., origin)
+   * @param sourceRef The commit/ref in the source to fetch LFS files from
+   * @param destinationUrl The URL to push LFS objects to (e.g., destination)
+   * @param missingObjectIds List of LFS object IDs (SHA256 hashes) that are missing
    * @throws RepoException if LFS operations fail
    */
-  public void lfsPullForRef(String remoteUrl, String ref) throws RepoException {
-    logger.atInfo().log("Pulling LFS files for ref '%s' from %s", ref, remoteUrl);
+  public void lfsPushMissingObjects(String sourceUrl, String sourceRef, String destinationUrl, 
+      ImmutableList<String> missingObjectIds) throws RepoException {
+    
+    if (missingObjectIds.isEmpty()) {
+      logger.atInfo().log("No missing LFS objects to push");
+      return;
+    }
+    
+    logger.atInfo().log("Fetching and pushing %d missing LFS object(s)", missingObjectIds.size());
     
     try {
-      // Step 1: Add remote.origin.url (required for git lfs pull to work)
-      simpleCommand("config", "remote.origin.url", remoteUrl);
+      // Step 1: Configure remote to source and fetch the commit with LFS files
+      simpleCommand("config", "remote.origin.url", sourceUrl);
       
-      // Step 2: Pull LFS files only for the specific ref
-      logger.atInfo().log("Executing: git lfs pull origin %s", ref);
-      simpleCommand("lfs", "pull", "origin", ref);
+      logger.atInfo().log("Fetching LFS files for commit %s from %s", sourceRef, sourceUrl);
+      // Use 'git lfs pull origin <ref>' to fetch LFS files for this specific commit
+      simpleCommand("lfs", "pull", "origin", sourceRef);
       
-      // Step 3: Unset remote.origin.url (cleanup)
+      // Step 2: Push missing objects to destination
+      logger.atInfo().log("Pushing %d LFS object(s) to destination", missingObjectIds.size());
+      for (String objectId : missingObjectIds) {
+        try {
+          logger.atInfo().log("Pushing LFS object: %s", objectId);
+          simpleCommand("lfs", "push", destinationUrl, "--object-id", objectId);
+        } catch (RepoException e) {
+          logger.atWarning().withCause(e).log(
+              "Failed to push LFS object %s to %s", objectId, destinationUrl);
+          // Continue with other objects even if one fails
+        }
+      }
+      
+      // Step 3: Cleanup remote.origin.url
       simpleCommand("config", "--unset", "remote.origin.url");
       
-      logger.atInfo().log("Successfully pulled LFS files for ref '%s'", ref);
+      logger.atInfo().log("Successfully pushed %d LFS object(s)", missingObjectIds.size());
     } catch (RepoException e) {
       // Attempt cleanup even on error
       try {
@@ -1717,7 +1733,7 @@ public class GitRepository {
         logger.atWarning().withCause(cleanupError).log(
             "Failed to cleanup remote.origin.url after LFS error");
       }
-      throw new RepoException("Failed to pull LFS files: " + e.getMessage(), e);
+      throw new RepoException("Failed to push missing LFS objects: " + e.getMessage(), e);
     }
   }
 

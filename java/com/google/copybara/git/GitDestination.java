@@ -37,6 +37,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Iterables;
 import com.google.common.flogger.FluentLogger;
+import com.google.re2j.Matcher;
+import com.google.re2j.Pattern;
 import com.google.copybara.ChangeMessage;
 import com.google.copybara.Destination;
 import com.google.copybara.DestinationReader;
@@ -527,9 +529,6 @@ public class GitDestination implements Destination<GitRevision> {
       GitRevision localBranchRevision = getLocalBranchRevision(scratchClone);
       updateLocalBranchToBaseline(scratchClone, baseline);
       
-      // Capture firstWrite state before it gets modified
-      boolean isFirstWrite = state.firstWrite;
-      
       if (state.firstWrite) {
         String reference = baseline != null ? baseline : state.localBranch;
         configForPush(getRepository(console), repoUrl, remotePush);
@@ -733,22 +732,33 @@ public class GitDestination implements Destination<GitRevision> {
                         .run());
       } catch (RepoException | ValidationException pushException) {
         // Check if this looks like an LFS-related push failure
-        boolean isLfsError = pushException.getMessage().contains("failed to push some refs");
+        boolean isLfsError = pushException.getMessage().contains("failed to push some refs")
+            || pushException.getMessage().contains("unknown Git LFS object");
         
         if (isLfsError && lfsSource != null) {
-          // LFS error detected and lfsSource is configured - try the LFS workaround
-          console.warn("Push failed, attempting LFS workaround...");
-          logger.atInfo().log("Push failed with potential LFS error, attempting LFS pull workaround");
+          // LFS error detected - parse the error to find missing object IDs
+          console.warn("Push failed with LFS error, parsing error to identify missing objects...");
+          logger.atInfo().log("Push failed with LFS error, will parse error output for missing object IDs");
           
-          // Get the origin commit SHA from transformResult
-          String originRef = transformResult.getCurrentRevision().asString();
-          logger.atInfo().log("Will pull LFS objects for origin commit: %s", originRef);
+          // Parse the error message to extract missing LFS object IDs
+          ImmutableList<String> missingObjectIds = parseLfsMissingObjectIds(pushException.getMessage());
+          
+          if (missingObjectIds.isEmpty()) {
+            logger.atWarning().log("Could not find any LFS object IDs in push error, rethrowing exception");
+            throw pushException;
+          }
+          
+          console.infoFmt("Found %d missing LFS object(s) in push error", missingObjectIds.size());
           
           try {
-            scratchClone.lfsPullForRef(lfsSource, originRef);
-            console.progress("Git Destination: Retrying push after LFS pull");
+            // Fetch and push missing LFS objects
+            // Get the source commit SHA from the transform result
+            String sourceCommit = transformResult.getCurrentRevision().asString();
+            console.progress("Git Destination: Pushing missing LFS objects to destination");
+            scratchClone.lfsPushMissingObjects(lfsSource, sourceCommit, repoUrl, missingObjectIds);
+            console.progress("Git Destination: Retrying push after pushing missing LFS objects");
             
-            // Retry the push after LFS pull
+            // Retry the push after pushing missing LFS objects
             serverResponse =
                 generalOptions.repoTask(
                     "push",
@@ -769,8 +779,8 @@ public class GitDestination implements Destination<GitRevision> {
                             .withPushOptions(ImmutableList.copyOf(gitOptions.gitPushOptions))
                             .run());
             
-            console.info("Push succeeded after LFS workaround");
-            logger.atInfo().log("Push succeeded after LFS pull workaround");
+            console.info("Push succeeded after pushing missing LFS objects");
+            logger.atInfo().log("Push succeeded after LFS object push workaround");
           } catch (RepoException lfsOrRetryException) {
             // LFS pull failed or retry push failed
             logger.atSevere().withCause(lfsOrRetryException).log(
@@ -1097,6 +1107,39 @@ public class GitDestination implements Destination<GitRevision> {
     }
 
     return builder.build();
+  }
+
+  /**
+   * Parse LFS object IDs from push error output.
+   * Expected format from GitHub/GitLab:
+   *   remote: error: GH008: Your push referenced at least 1 unknown Git LFS object:
+   *   remote:     b9a6f34acd6b278ef3c038ed6b2c19431d40cbec6c375887dada704471cab7f5
+   *   remote: Try to push them with 'git lfs push --all'.
+   */
+  private static ImmutableList<String> parseLfsMissingObjectIds(String errorOutput) {
+    ImmutableList.Builder<String> objectIds = ImmutableList.builder();
+    
+    for (String line : Splitter.on('\n').omitEmptyStrings().trimResults().split(errorOutput)) {
+      // Look for lines that contain SHA256 hashes (64 hex characters)
+      // They might be prefixed with "remote:" or whitespace
+      String cleanedLine = line.replaceFirst("^remote:\\s*", "").trim();
+      
+      // Check if the line is purely a SHA256 hash or contains one
+      if (cleanedLine.matches("[a-f0-9]{64}")) {
+        // Entire line is a hash
+        objectIds.add(cleanedLine);
+      } else {
+        // Try to extract hash from line
+        Pattern pattern = Pattern.compile("[a-f0-9]{64}");
+        Matcher matcher = pattern.matcher(cleanedLine);
+        while (matcher.find()) {
+          String objectId = matcher.group();
+          objectIds.add(objectId);
+        }
+      }
+    }
+    
+    return objectIds.build();
   }
 
   @Override
