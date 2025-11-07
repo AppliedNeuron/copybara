@@ -4,6 +4,10 @@ set -exo
 
 bazel build //java/com/google/copybara:copybara_deploy.jar
 
-cp -f bazel-bin/java/com/google/copybara/copybara_deploy.jar ../core-stack
+SHA256SUM=$(sha256sum bazel-bin/java/com/google/copybara/copybara_deploy.jar | awk '{print $1}')
 
-../core-stack/vehicle_os/docker/dev/in_docker.sh -nobringup direct_noninteractive sudo cp -f /mosaic/copybara_deploy.jar /opt/copybara/copybara_deploy.jar
+aws s3 cp bazel-bin/java/com/google/copybara/copybara_deploy.jar s3://applied-vehicle-os/copybara/${SHA256SUM}/copybara_deploy.jar --acl public-read --acl bucket-owner-full-control
+
+echo "Copybara deployed to s3://applied-vehicle-os/copybara/${SHA256SUM}/copybara_deploy.jar"
+
+echo "Change the COPYBARA_ARCHIVE_SHA in vehicle_os/repository_rules/deps.bzl to ${SHA256SUM} to use the new version."
