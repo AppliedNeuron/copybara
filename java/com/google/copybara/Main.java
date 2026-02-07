@@ -90,7 +90,8 @@ public class Main {
               "migrate", true,
               "info", false,
               "validate", false,
-              "regenerate", true);
+              "regenerate", true,
+              "list_files", true);
 
   private static final FluentLogger logger = FluentLogger.forEnclosingClass();
   private static final String BUILD_DATA_PROPERTIES = "/build-data.properties";
@@ -287,7 +288,8 @@ public class Main {
         new OnboardCmd(),
         new GeneratorCmd(moduleSet),
         new VersionCmd(),
-        new RegenerateCmd(configLoaderProvider));
+        new RegenerateCmd(configLoaderProvider),
+        new ListFilesCmd(configLoaderProvider, moduleSet));
   }
 
   protected void initMonitoringEnvironment(CommandEnv commandEnv, ImmutableList<String> args) {

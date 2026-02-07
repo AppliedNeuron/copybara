@@ -45,6 +45,7 @@ import com.google.copybara.http.HttpOptions;
 import com.google.copybara.onboard.GeneratorOptions;
 import com.google.copybara.regenerate.RegenerateOptions;
 import com.google.copybara.remotefile.RemoteFileOptions;
+import com.google.copybara.ListFilesOptions;
 import com.google.copybara.testing.TestingModule.TestingOptions;
 import com.google.copybara.transform.debug.DebugOptions;
 import com.google.copybara.transform.patch.PatchingOptions;
@@ -110,6 +111,7 @@ public class OptionsBuilder {
   public TestingOptions testingOptions = new TestingOptions();
 
   public RegenerateOptions regenerateOptions = new RegenerateOptions();
+  public ListFilesOptions listFilesOptions = new ListFilesOptions();
 
   public final OptionsBuilder setWorkdirToRealTempDir() {
     return setWorkdirToRealTempDir(StandardSystemProperty.USER_DIR.value());
@@ -195,6 +197,7 @@ public class OptionsBuilder {
         generator,
         http,
         regenerateOptions,
+        listFilesOptions,
         credentialOptions);
   }
 

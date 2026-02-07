@@ -176,6 +176,7 @@ public class ModuleSupplier {
             new GeneratorOptions(),
             new HttpOptions(),
             new RegenerateOptions(),
+            new ListFilesOptions(),
             new CredentialOptions()));
   }
 

@@ -224,6 +224,39 @@ public final class FileUtil {
   }
 
   /**
+   * Lists the relative paths of all files under {@code path} that match the given {@link Glob}.
+   * Directories are not included. Paths are normalized and sorted.
+   *
+   * @param path the root directory to walk
+   * @param glob the glob to match files against (relative to {@code path})
+   * @return sorted list of relative path strings (e.g. "foo/bar.txt")
+   * @throws IOException if traversal fails
+   */
+  public static ImmutableList<String> listMatchingFiles(Path path, Glob glob) throws IOException {
+    Path normalizedRoot = path.normalize();
+    LinkedHashSet<String> matches = new LinkedHashSet<>();
+    for (String root : glob.roots()) {
+      Path rootPath = normalizedRoot.resolve(root);
+      if (Files.exists(rootPath)) {
+        PathMatcher matcher = glob.relativeTo(normalizedRoot);
+        Files.walkFileTree(
+            rootPath,
+            new SimpleFileVisitor<Path>() {
+              @Override
+              public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                  throws IOException {
+                if (matcher.matches(file)) {
+                  matches.add(normalizedRoot.relativize(file).toString());
+                }
+                return FileVisitResult.CONTINUE;
+              }
+            });
+      }
+    }
+    return ImmutableList.sortedCopyOf(matches);
+  }
+
+  /**
    * Delete all the contents of a path recursively.
    *
    * <p>First we try to delete securely. In case the FileSystem doesn't support it,
