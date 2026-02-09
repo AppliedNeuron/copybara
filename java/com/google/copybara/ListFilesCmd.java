@@ -42,16 +42,15 @@ import javax.annotation.Nullable;
 /**
  * Command that lists the files included by a workflow's origin_files at a given reference. Resolves
  * the workflow's origin glob against the origin at the given ref (or HEAD) and prints one path per
- * line. Optionally prints only the glob expression (--globs-only) or writes to a file (--output).
+ * line. Optionally writes to a file (--output).
  *
  * <p>Usage: copybara list_files copy.bara.sky WORKFLOW_NAME [REF] [--output=path]
- * [--globs-only]
  */
 @Parameters(
     separators = "=",
     commandDescription =
         "Lists the files that match the workflow's origin_files at the given reference (or HEAD)."
-            + " Output is one path per line. Use --globs-only to print only the glob expression;"
+            + " Output is one path per line. "
             + " use --output=path to write to a file.")
 public class ListFilesCmd implements CopybaraCmd {
 
