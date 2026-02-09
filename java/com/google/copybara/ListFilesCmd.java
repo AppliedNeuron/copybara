@@ -71,7 +71,7 @@ public class ListFilesCmd implements CopybaraCmd {
     if (configFileArgs == null) {
       throw new CommandLineException(
           "Configuration file missing for 'list_files' subcommand. Usage: copybara list_files"
-              + " copy.bara.sky WORKFLOW_NAME [REF] [--output=path] [--globs-only]");
+              + " copy.bara.sky WORKFLOW_NAME [REF] [--output=path]");
     }
 
     ImmutableList<String> sourceRefs = configFileArgs.getSourceRefs();
@@ -94,6 +94,7 @@ public class ListFilesCmd implements CopybaraCmd {
             .newLoader(configFileArgs.getConfigPath(), sourceRef)
             .loadWithDependencies(console);
 
+    // Only works for Workflows since we are required to have origin_files.
     Migration migration = config.getConfig().getMigration(workflowName);
     checkCondition(
         migration instanceof Workflow,
@@ -103,25 +104,6 @@ public class ListFilesCmd implements CopybaraCmd {
     @SuppressWarnings("unchecked")
     Workflow<? extends Revision, ? extends Revision> workflow =
         (Workflow<? extends Revision, ? extends Revision>) migration;
-
-    if (listFilesOptions.isGlobsOnly()) {
-      String globString = workflow.getOriginFiles().toString();
-      if (listFilesOptions.getOutputPath() != null) {
-        Path outputPath =
-            generalOptions.getFileSystem().getPath(listFilesOptions.getOutputPath());
-        if (!outputPath.isAbsolute()) {
-          outputPath = commandEnv.getWorkdir().resolve(listFilesOptions.getOutputPath());
-        }
-        Path parent = outputPath.getParent();
-        if (parent != null) {
-          Files.createDirectories(parent);
-        }
-        Files.writeString(outputPath, globString + "\n", StandardCharsets.UTF_8);
-      } else {
-        console.info(globString);
-      }
-      return ExitCode.SUCCESS;
-    }
 
     // Resolve ref and checkout to list resolved files.
     Path checkoutDir =
@@ -136,20 +118,26 @@ public class ListFilesCmd implements CopybaraCmd {
       if (paths.isEmpty()) {
         console.warn(
             "list_files: No files matched. Check that the origin checkout succeeded and that"
-                + " origin_files matches the repo layout. Try --globs-only to inspect the glob.");
+                + " origin_files matches the repo layout.");
       }
 
       String content = String.join("\n", paths) + (paths.isEmpty() ? "" : "\n");
+
       if (listFilesOptions.getOutputPath() != null) {
+        // Get absolute path to output file.
         Path outputPath =
             generalOptions.getFileSystem().getPath(listFilesOptions.getOutputPath());
         if (!outputPath.isAbsolute()) {
           outputPath = commandEnv.getWorkdir().resolve(listFilesOptions.getOutputPath());
         }
         Path parent = outputPath.getParent();
+
+        // Create parent directories if they don't exist.
         if (parent != null) {
           Files.createDirectories(parent);
         }
+
+        // Write content to output file.
         Files.writeString(outputPath, content, StandardCharsets.UTF_8);
         console.verboseFmt("Wrote %d paths to %s", paths.size(), outputPath);
       } else {

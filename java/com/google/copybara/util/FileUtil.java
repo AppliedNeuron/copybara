@@ -235,23 +235,30 @@ public final class FileUtil {
   public static ImmutableList<String> listMatchingFiles(Path path, Glob glob) throws IOException {
     Path normalizedRoot = path.normalize();
     LinkedHashSet<String> matches = new LinkedHashSet<>();
+
+    // Iterate over the glob roots.
+    // Example, if glob is "foo/**", then roots will be ["foo"].
     for (String root : glob.roots()) {
       Path rootPath = normalizedRoot.resolve(root);
-      if (Files.exists(rootPath)) {
-        PathMatcher matcher = glob.relativeTo(normalizedRoot);
-        Files.walkFileTree(
-            rootPath,
-            new SimpleFileVisitor<Path>() {
-              @Override
-              public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
-                  throws IOException {
-                if (matcher.matches(file)) {
-                  matches.add(normalizedRoot.relativize(file).toString());
-                }
-                return FileVisitResult.CONTINUE;
-              }
-            });
+      // If the provided glob root does not exist in the repo, log a warning and skip.
+      if (!Files.exists(rootPath)) {
+        logger.atInfo().log("Glob root %s does not exist in repo", root);
+        continue;
       }
+      PathMatcher matcher = glob.relativeTo(normalizedRoot);
+      Files.walkFileTree(
+          rootPath,
+          // Lambda which saves all matching files to the matches set.
+          new SimpleFileVisitor<Path>() {
+            @Override
+            public FileVisitResult visitFile(Path file, BasicFileAttributes attrs)
+                throws IOException {
+              if (matcher.matches(file)) {
+                matches.add(normalizedRoot.relativize(file).toString());
+              }
+              return FileVisitResult.CONTINUE;
+            }
+          });
     }
     return ImmutableList.sortedCopyOf(matches);
   }

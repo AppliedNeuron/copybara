@@ -36,19 +36,9 @@ public class ListFilesOptions implements Option {
               + " paths (default behavior).")
   private String outputPath;
 
-  @Parameter(
-      names = "--globs-only",
-      description =
-          "Print only the origin_files glob expression (includes/excludes) for the workflow"
-              + " without resolving against the origin.")
-  private boolean globsOnly = false;
-
   @Nullable
   public String getOutputPath() {
     return outputPath;
   }
 
-  public boolean isGlobsOnly() {
-    return globsOnly;
-  }
 }
