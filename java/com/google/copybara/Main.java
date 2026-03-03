@@ -472,7 +472,9 @@ public class Main {
               + "java.util.logging.FileHandler.count=10\n"
               + "java.util.logging.FileHandler.formatter=java.util.logging.SimpleFormatter\n"
               + "java.util.logging.SimpleFormatter.format="
-              + "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS %4$-6s %2$s %5$s%6$s%n")
+              + "%1$tY-%1$tm-%1$td %1$tH:%1$tM:%1$tS %4$-6s %2$s %5$s%6$s%n\n"
+              + "java.util.logging.ConsoleHandler.level=INFO\n"
+              + "com.google.copybara.git.GitRepository.handlers=java.util.logging.ConsoleHandler\n")
           .getBytes(StandardCharsets.UTF_8)
       ));
     }
