@@ -373,6 +373,9 @@ public class GitRepository {
       throw new CannotResolveRevisionException("Fetching refspecs that"
           + " contain local ref path locations or wildcards is not supported. Invalid ref: " + ref);
     }
+    logger.atInfo().log(
+        "fetchSingleRefWithTags: url=%s ref=%s fetchTags=%s partialFetch=%s depth=%s",
+        url, ref, fetchTags, partialFetch, depth);
     // This is not strictly necessary for some Git repos that allow fetching from any sha1 ref, like
     // servers configured with 'git config uploadpack.allowReachableSHA1InWant true'. Unfortunately,
     // Github doesn't support it. So what we do is fetch the default refspec (see the comment
@@ -383,6 +386,11 @@ public class GitRepository {
     if (isSha1Ref) {
       boolean tags = !partialFetch && fetchTags;
       try {
+        logger.atInfo().log(
+            "fetchSingleRefWithTags: SHA1 ref detected, fetching HEAD from %s (tags=%s,"
+                + " partialFetch=%s)",
+            url, tags, partialFetch);
+        long sha1FetchStart = System.nanoTime();
         fetch(
             url,
             /* prune= */ false,
@@ -391,6 +399,9 @@ public class GitRepository {
             partialFetch,
             depth,
             tags);
+        logger.atInfo().log(
+            "fetchSingleRefWithTags: SHA1 HEAD fetch completed in %.2fs",
+            (System.nanoTime() - sha1FetchStart) / 1e9);
       } catch (CannotResolveRevisionException e) {
         // Some servers are configured without HEAD. That is fine, we'll try fetching the SHA
         // instead.
@@ -424,6 +435,10 @@ public class GitRepository {
 
       try {
         // If this fails, the fetch below will resolve using a simpler refspec.
+        logger.atInfo().log(
+            "fetchSingleRefWithTags: attempting full refspec fetch from %s refspecs=%s",
+            url, fullRefspec.build());
+        long fullFetchStart = System.nanoTime();
         fetch(
             url,
             /* prune= */ false,
@@ -432,14 +447,28 @@ public class GitRepository {
             partialFetch,
             depth,
             false);
+        logger.atInfo().log(
+            "fetchSingleRefWithTags: full refspec fetch completed in %.2fs",
+            (System.nanoTime() - fullFetchStart) / 1e9);
         return resolveReferenceWithContext(
             String.format("%s/%s", COPYBARA_FETCH_NAMESPACE, ref), /* contextRef= */ ref, url);
       } catch (RepoException | CannotResolveRevisionException ignore) {
         // Ignore, the fetch below will attempt using a simpler refspec.
+        logger.atInfo().log(
+            "fetchSingleRefWithTags: full refspec fetch failed (%s), falling back to simple"
+                + " refspec",
+            ignore.getMessage());
       }
     }
 
+    logger.atInfo().log(
+        "fetchSingleRefWithTags: attempting simple refspec fetch from %s refspecs=%s",
+        url, refspec.build());
+    long simpleFetchStart = System.nanoTime();
     fetch(url, /* prune= */ false, /* force= */ true, refspec.build(), partialFetch, depth, false);
+    logger.atInfo().log(
+        "fetchSingleRefWithTags: simple refspec fetch completed in %.2fs",
+        (System.nanoTime() - simpleFetchStart) / 1e9);
     return resolveReferenceWithContext(
         String.format("%s/%s", COPYBARA_FETCH_NAMESPACE, ref), /* contextRef= */ ref, url);
   }
