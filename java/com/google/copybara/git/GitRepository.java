@@ -415,15 +415,22 @@ public class GitRepository {
       }
     }
 
+    String fetchRefspec = String.format("%s:%s/%s", ref, COPYBARA_FETCH_NAMESPACE, ref);
+    String tagsRefspec = "refs/tags/*:refs/tags/*";
+
     ImmutableList.Builder<String> refspec = ImmutableList.builder();
-    refspec.add(String.format("%s:%s/%s", ref, COPYBARA_FETCH_NAMESPACE, ref));
+    refspec.add(fetchRefspec);
     if (fetchTags) {
-      refspec.add("refs/tags/*:refs/tags/*");
+      refspec.add(tagsRefspec);
     }
 
     if (!ref.startsWith("refs/")) {
+      // Build the full refspec WITHOUT tags. The purpose of this fetch is only to discover the
+      // branch's full reference path (e.g. refs/heads/foo vs just foo). Fetching all tags here
+      // (refs/tags/*:refs/tags/*) is very expensive for repos with many tags and causes timeouts.
+      // Tags are fetched separately below after the ref is resolved.
       ImmutableList.Builder<String> fullRefspec = ImmutableList.builder();
-      fullRefspec.addAll(refspec.build());
+      fullRefspec.add(fetchRefspec);
       if (!isSha1Ref) {
         // Define a refspec that attempts to obtain the full reference using wildcards, for use in
         // GitRevision's fullReference() method.
@@ -450,6 +457,22 @@ public class GitRepository {
         logger.atInfo().log(
             "fetchSingleRefWithTags: full refspec fetch completed in %.2fs",
             (System.nanoTime() - fullFetchStart) / 1e9);
+        if (fetchTags) {
+          logger.atInfo().log(
+              "fetchSingleRefWithTags: fetching tags separately from %s", url);
+          long tagsFetchStart = System.nanoTime();
+          fetch(
+              url,
+              /* prune= */ false,
+              /* force= */ true,
+              ImmutableList.of(tagsRefspec),
+              partialFetch,
+              depth,
+              false);
+          logger.atInfo().log(
+              "fetchSingleRefWithTags: tags fetch completed in %.2fs",
+              (System.nanoTime() - tagsFetchStart) / 1e9);
+        }
         return resolveReferenceWithContext(
             String.format("%s/%s", COPYBARA_FETCH_NAMESPACE, ref), /* contextRef= */ ref, url);
       } catch (RepoException | CannotResolveRevisionException ignore) {
